@@ -40,7 +40,7 @@ class MCPlot():
         ax1.set_ylabel('Training loss', color='g')
         ax2.set_ylabel('Test loss', color='b')
 
-        figstr = 'Loss_u_' + str(self.session.graph.sz[0]) + '_i_' + str(self.session.graph.sz[0]) + '_iter_' + str(self.session.num_total_iter_training) + '_RMSE_' + str(self.session.RMSE) + '.png'
+        figstr = 'Loss_u_' + str(self.session.graph.sz[0]) + '_i_' + str(self.session.graph.sz[1]) + '_iter_' + str(self.session.num_total_iter_training) + '_RMSE_' + str(self.session.RMSE) + '.png'
         plt.savefig(self.imgpath+figstr)
 
     def plot_pred(self):
@@ -49,5 +49,5 @@ class MCPlot():
         plt.imshow(self.session.list_X[self.session.best_iter//self.session.num_iter_test])
         plt.colorbar()
 
-        figstr = 'Prediction_u_' + str(self.session.graph.sz[0]) + '_i_' + str(self.session.graph.sz[0]) + '_iter_' + str(self.session.num_total_iter_training) + '_RMSE_' + str(self.session.RMSE) + '.png'
+        figstr = 'Prediction_u_' + str(self.session.graph.sz[0]) + '_i_' + str(self.session.graph.sz[1]) + '_iter_' + str(self.session.num_total_iter_training) + '_RMSE_' + str(self.session.RMSE) + '.png'
         plt.savefig(self.imgpath+figstr)
