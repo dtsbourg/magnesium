@@ -27,6 +27,7 @@ import numpy as np
 class MCPlot():
     def __init__(self, session):
         self.session = session
+        self.imgpath = 'res/img/'
 
     def plot_loss(self, train=True, test=True):
         fig, ax1 = plt.subplots(figsize=(20,10))
@@ -40,7 +41,7 @@ class MCPlot():
         ax2.set_ylabel('Test loss', color='b')
 
         figstr = 'Loss_u_' + str(self.session.graph.sz[0]) + '_i_' + str(self.session.graph.sz[0]) + '_iter_' + str(self.session.num_total_iter_training) + '_RMSE_' + str(self.session.RMSE) + '.png'
-        plt.savefig(figstr)
+        plt.savefig(self.imgpath+figstr)
 
     def plot_pred(self):
         plt.figure(figsize=(20,10))
@@ -49,4 +50,4 @@ class MCPlot():
         plt.colorbar()
 
         figstr = 'Prediction_u_' + str(self.session.graph.sz[0]) + '_i_' + str(self.session.graph.sz[0]) + '_iter_' + str(self.session.num_total_iter_training) + '_RMSE_' + str(self.session.RMSE) + '.png'
-        plt.savefig(figstr)
+        plt.savefig(self.imgpath+figstr)

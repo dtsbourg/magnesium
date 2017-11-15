@@ -26,6 +26,7 @@ import numpy as np
 from scipy.sparse import csgraph
 import time
 import pandas as pd
+import tensorflow as tf
 
 from model import Train_test_matrix_completion
 from graphutils import interaction_matrix
@@ -53,6 +54,9 @@ class MCSession():
         self.list_training_loss = None
         self.list_test_pred_error = None
         self.list_X = None
+        self.persistpath = 'res/'
+        self.saver = None
+        self.save_path = 'res/model/model.ckpt'
 
     # M = ratings
     # O = data mask
@@ -101,6 +105,8 @@ class MCSession():
         self.graph = uig
 
     def train(self):
+        print("Starting training ...")
+
         learning_obj = Train_test_matrix_completion(self.graph.M, self.graph.Lrow, self.graph.Lcol, self.graph.O, self.graph.Otraining, self.graph.Otest,
                                                     order_chebyshev_col = self.ord_col, order_chebyshev_row = self.ord_row,
                                                     gamma=1e-8, learning_rate=1e-3)
@@ -111,10 +117,8 @@ class MCSession():
 
         list_training_times = list(); list_test_times = list(); list_grad_X = list()
 
-
         num_iter = 0
         for k in range(num_iter, self.num_total_iter_training):
-
             tic = time.time()
             _, current_training_loss, norm_grad, X_grad = learning_obj.session.run([learning_obj.optimizer, learning_obj.loss,
                                                                                     learning_obj.norm_grad, learning_obj.var_grad])
@@ -131,8 +135,9 @@ class MCSession():
 
                 #Test Code
                 tic = time.time()
-                pred_error, preds, X = learning_obj.session.run([learning_obj.predictions_error, learning_obj.predictions,
-                                                                                     learning_obj.norm_X])
+                pred_error, preds, X = learning_obj.session.run([learning_obj.predictions_error,
+                                                                 learning_obj.predictions,
+                                                                 learning_obj.norm_X])
                 c_X_evolutions = learning_obj.session.run(learning_obj.list_X)
                 list_X_evolutions.append(c_X_evolutions)
 
@@ -141,31 +146,42 @@ class MCSession():
                 list_test_pred_error.append(pred_error)
                 list_X.append(X)
                 list_test_times.append(test_time)
-                msg =  "[TST] iter = %03i, cost = %3.2e (%3.2es)" % (num_iter, list_test_pred_error[-1], test_time)
+                msg = "[TST] iter = %03i, cost = %3.2e (%3.2es)" % (num_iter, list_test_pred_error[-1], test_time)
                 print(msg)
 
             num_iter += 1
 
-        self.best_iter = (np.where(np.asarray(list_training_loss)==np.min(list_training_loss))[0][0]//self.num_iter_test)*self.num_iter_test
+        self.best_iter       = (np.where(np.asarray(list_training_loss)==np.min(list_training_loss))[0][0]//self.num_iter_test)*self.num_iter_test
         self.best_pred_error = list_test_pred_error[self.best_iter//self.num_iter_test]
-        self.RMSE = np.sqrt(np.square(self.best_pred_error)/np.sum(self.graph.Otest))
+        self.RMSE            = np.sqrt(np.square(self.best_pred_error)/np.sum(self.graph.Otest))
 
-        self.list_training_loss = list_training_loss
+        self.list_training_loss   = list_training_loss
         self.list_test_pred_error = list_test_pred_error
+
         self.list_X = list_X
 
+        print("Persisting results")
         self.persist_results()
+
+        print("Saving model in file: %s ..." % self.save_path)
+        self.saver = tf.train.Saver(learning_obj.vars)
+        self.saver.save(learning_obj.session, self.save_path)
+
+    def load_saved_model(self):
+        self.saver.restore(self.session, self.save_path)
+        print("Model restored.")
+        # TODO Evaluate saved model
 
     def print_results(self):
         print('Best predictions at iter: %d (error: %f)' % (self.best_iter, self.best_pred_error))
         print('RMSE: %f' % self.RMSE)
 
     def persist_results(self):
-        joblib.dump( self.list_training_loss, open( "list_training_loss.p", "wb" ) )
-        joblib.dump( self.list_test_pred_error, open( "test_pred_errors.p", "wb" ) )
-        joblib.dump( self.list_X, open( "list_X.p", "wb" ) )
+        joblib.dump(self.list_training_loss,   open(self.persistpath+"list_training_loss.p", "wb" ) )
+        joblib.dump(self.list_test_pred_error, open(self.persistpath+"test_pred_errors.p", "wb" ) )
+        joblib.dump(self.list_X,               open(self.persistpath+"list_X.p", "wb" ) )
 
     def load_persistent(self):
-        self.list_training_loss = joblib.load("list_training_loss.p")
-        self.list_test_pred_error = joblib.load("test_pred_errors.p")
-        self.list_X = joblib.load("list_X.p")
+        self.list_training_loss   = joblib.load(self.persistpath+"list_training_loss.p")
+        self.list_test_pred_error = joblib.load(self.persistpath+"test_pred_errors.p")
+        self.list_X               = joblib.load(self.persistpath+"list_X.p")

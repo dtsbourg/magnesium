@@ -186,3 +186,6 @@ class Train_test_matrix_completion:
                         # Run the Op to initialize the variables.
                         init = tf.initialize_all_variables()
                         self.session.run(init)
+
+                        variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
+                        self.vars = {var.name: var for var in variables}
