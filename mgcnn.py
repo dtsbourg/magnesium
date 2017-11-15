@@ -17,14 +17,13 @@ https://github.com/fmonti/mgcnn for the Netflix challenge.
 
 ---
 
-mgcnn.py : The main interface
+mgcnn.py : The interface to the MGCNN class
 
 """
 
 import os,sys,inspect
 import os
 import joblib
-import tensorflow as tf
 import numpy as np
 import h5py
 import scipy.sparse.linalg as la
@@ -35,46 +34,21 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from model import Train_test_matrix_completion
+from graph import interaction_matrix
 
-path_dataset = 'data/data_train.csv'
+# M = ratings
+# O = data mask
+# Otraining = training mask
+# Otest = test mask
+# Wrow = user adjacency matrix
+# Wcol = movie adjacency matrix
+def load_dataset(interactions, user_count=150, item_count=200, split=0.5):
+    # interactions = [us,is,rs]
+    sz = (user_count, item_count); user_range = len(interactions[0])
 
-def interaction_matrix(W, O, ax):
-    for k in range(O.shape[ax]):
-        if ax==0:
-            o = O[k,:].copy()
-        else:
-            o = O[:,k].copy()
-        a = o.nonzero()
-        for i in a:
-            for j in i:
-                o_ = o
-                o_[j] = 0
-                if ax == 0:
-                    W[j,:] += o_
-                    #W[j,:] = np.logical_or(W[j,:], o_).astype(int)
-                else:
-                    W[:,j] += o_
-                    #W[:,j] = np.logical_or(W[:,j], o_).astype(int)
-    return W
-
-
-def load_dataset(path=path_dataset, user_count=150, item_count=200, split=0.5):
-    # M = ratings
-    # O = data mask
-    # Otraining = training mask
-    # Otest = test mask
-    # Wrow = user adjacency matrix
-    # Wcol = movie adjacency matrix
-    print("Loading dataset ...")
-    ratings = pd.read_csv(path_dataset, dtype={'Prediction': np.float})
-    print("Extracting index ...")
-    idx = ratings.Id.str.extract('r([0-9]+)_c([0-9]+)', expand=True)
-    idx = idx[(idx[0].astype(int)<user_count) & (idx[1].astype(int)<item_count)].reset_index(drop=True)
-
-    user_idx = idx[0].astype(int)
-    item_idx = idx[1].astype(int)
-    sz = (user_count, item_count)
-    user_range = len(idx)
+    user_idx = interactions[0]
+    item_idx = interactions[1]
+    ratings  = interactions[2]
 
     print("Initialising model variables ...")
     M = np.zeros(sz, dtype=np.float)
@@ -85,7 +59,7 @@ def load_dataset(path=path_dataset, user_count=150, item_count=200, split=0.5):
     print("Building dataset ...")
     for j in range(user_range):
         u = user_idx[j]-1; i=item_idx[j]-1;
-        M[u,i] = ratings.Prediction[j]
+        M[u,i] = ratings[j]
         O[u,i] = 1
 
     print("Computing Leave-one-out test split ...")
@@ -208,11 +182,3 @@ def plot(list_training_loss, list_test_pred_error, list_X, Otest, num_iter_test=
     plt.imshow(list_X[best_iter//num_iter_test])
     plt.colorbar()
     plt.savefig('results_10kval_n_iter_50')
-
-if __name__ == '__main__':
-    M, Lrow, Lcol, Odata, Otraining, Otest = load_dataset()
-    #list_training_loss, list_test_pred_error, list_X, learning_obj = train(M, Lrow, Lcol, Odata, Otraining, Otest)
-    #list_training_loss = joblib.load("list_training_loss.p")
-    #list_test_pred_error = joblib.load("test_pred_errors.p")
-    #list_X = joblib.load("list_X.p")
-    #plot(list_training_loss, list_test_pred_error, list_X, Otest, num_iter_test=250)
