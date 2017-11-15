@@ -177,8 +177,11 @@ class MCSession():
         self.learning_obj = Train_test_matrix_completion(self.graph.M, self.graph.Lrow, self.graph.Lcol, self.graph.O, self.graph.Otraining, self.graph.Otest,
                                                     order_chebyshev_col = self.ord_col, order_chebyshev_row = self.ord_row,
                                                     gamma=1e-8, learning_rate=1e-3)
-        self.saver = tf.train.Saver(self.learning_obj.vars)
-        self.saver.restore(self.learning_obj.session, self.save_path)
+        try:
+            self.saver = tf.train.Saver(self.learning_obj.vars)
+            self.saver.restore(self.learning_obj.session, self.save_path)
+        except Exception as e:
+            raise ValueError("Can't load existing model")
 
         print("Model restored.")
         _, current_training_loss, norm_grad, X_grad = self.learning_obj.session.run([self.learning_obj.optimizer, self.learning_obj.loss,

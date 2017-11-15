@@ -42,7 +42,7 @@ def load_netflix(path_dataset, user_count=150, item_count=200):
 
 
 if __name__ == '__main__':
-    session = MCSession()
+    session = MCSession(1000)
     plotter = MCPlot(session)
 
     path_dataset = 'data/data_train.csv'
@@ -50,7 +50,7 @@ if __name__ == '__main__':
 
     session.load_dataset(interactions)
 
-    session.load_existing = True
+    session.load_existing = False
 
     if session.load_existing:
         session.load_saved_model()
