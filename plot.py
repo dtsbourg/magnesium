@@ -22,37 +22,31 @@ plot.py : Some plotting utilies
 """
 
 import matplotlib.pyplot as plt
+import numpy as np
 
-class Plotter():
-    def __init__(self, training_losses, test_losses, list_X):
-        self.training_losses = training_losses
-        self.test_losses = test_losses
-        
+class MCPlot():
+    def __init__(self, session):
+        self.session = session
 
+    def plot_loss(self, train=True, test=True):
+        fig, ax1 = plt.subplots(figsize=(20,10))
 
-def plot_loss(train=True, test=True):
-    best_iter = (np.where(np.asarray(list_training_loss)==np.min(list_training_loss))[0][0]//num_iter_test)*num_iter_test
-    best_pred_error = list_test_pred_error[best_iter//num_iter_test]
-    print('Best predictions at iter: %d (error: %f)' % (best_iter, best_pred_error))
-    RMSE = np.sqrt(np.square(best_pred_error)/np.sum(Otest))
-    print('RMSE: %f' % RMSE)
+        ax2 = ax1.twinx()
+        ax1.plot(np.arange(len(self.session.list_training_loss)), self.session.list_training_loss, 'g-')
+        ax2.plot(np.arange(len(self.session.list_test_pred_error))*self.session.num_iter_test, self.session.list_test_pred_error, 'b-')
 
-    fig, ax1 = plt.subplots(figsize=(20,10))
+        ax1.set_xlabel('Iteration')
+        ax1.set_ylabel('Training loss', color='g')
+        ax2.set_ylabel('Test loss', color='b')
 
-    ax2 = ax1.twinx()
-    ax1.plot(np.arange(len(list_training_loss)), list_training_loss, 'g-')
-    ax2.plot(np.arange(len(list_test_pred_error))*num_iter_test, list_test_pred_error, 'b-')
+        figstr = 'Loss_u_' + str(self.session.graph.sz[0]) + '_i_' + str(self.session.graph.sz[0]) + '_iter_' + str(self.session.num_total_iter_training) + '_RMSE_' + str(self.session.RMSE) + '.png'
+        plt.savefig(figstr)
 
-    ax1.set_xlabel('Iteration')
-    ax1.set_ylabel('Training loss', color='g')
-    ax2.set_ylabel('Test loss', color='b')
+    def plot_pred(self):
+        plt.figure(figsize=(20,10))
 
-    plt.savefig('loss.png')
+        plt.imshow(self.session.list_X[self.session.best_iter//self.session.num_iter_test])
+        plt.colorbar()
 
-def plot(list_training_loss, list_test_pred_error, list_X, Otest, num_iter_test):
-
-
-    plt.figure(figsize=(20,10))
-    plt.imshow(list_X[best_iter//num_iter_test])
-    plt.colorbar()
-    plt.savefig('results_10kval_n_iter_50')
+        figstr = 'Prediction_u_' + str(self.session.graph.sz[0]) + '_i_' + str(self.session.graph.sz[0]) + '_iter_' + str(self.session.num_total_iter_training) + '_RMSE_' + str(self.session.RMSE) + '.png'
+        plt.savefig(figstr)

@@ -24,8 +24,8 @@ import pandas as pd
 import numpy as np
 import joblib
 
-from mgcnn import load_dataset, train
-from plot import plot
+from mgcnn import MCSession
+from plot import MCPlot
 
 def load_netflix(path_dataset, user_count=150, item_count=200):
     print("Loading dataset ...")
@@ -42,11 +42,15 @@ def load_netflix(path_dataset, user_count=150, item_count=200):
 
 
 if __name__ == '__main__':
+    session = MCSession()
+    plotter = MCPlot(session)
+
     path_dataset = 'data/data_train.csv'
     interactions = load_netflix(path_dataset)
-    uig = load_dataset(interactions)
-    list_training_loss, list_test_pred_error, list_X, learning_obj = train(uig)
-    list_training_loss = joblib.load("list_training_loss.p")
-    list_test_pred_error = joblib.load("test_pred_errors.p")
-    list_X = joblib.load("list_X.p")
-    #plot(list_training_loss, list_test_pred_error, list_X, uig.Otest, num_iter_test=50)
+
+    session.load_dataset(interactions)
+
+    session.train()
+
+    plotter.plot_loss()
+    plotter.plot_pred()
