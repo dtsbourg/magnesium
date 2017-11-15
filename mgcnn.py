@@ -21,14 +21,9 @@ mgcnn.py : The interface to the MGCNN class
 
 """
 
-import os,sys,inspect
-import os
 import joblib
 import numpy as np
-import h5py
-import scipy.sparse.linalg as la
 from scipy.sparse import csgraph
-import scipy
 import time
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -161,7 +156,7 @@ def train(M, Lrow, Lcol, Odata, Otraining, Otest):
 
 
 
-def plot(list_training_loss, list_test_pred_error, list_X, Otest, num_iter_test=25000):
+def plot(list_training_loss, list_test_pred_error, list_X, Otest, num_iter_test):
     best_iter = (np.where(np.asarray(list_training_loss)==np.min(list_training_loss))[0][0]//num_iter_test)*num_iter_test
     best_pred_error = list_test_pred_error[best_iter//num_iter_test]
     print('Best predictions at iter: %d (error: %f)' % (best_iter, best_pred_error))
@@ -177,6 +172,8 @@ def plot(list_training_loss, list_test_pred_error, list_X, Otest, num_iter_test=
     ax1.set_xlabel('Iteration')
     ax1.set_ylabel('Training loss', color='g')
     ax2.set_ylabel('Test loss', color='b')
+
+    plt.savefig('loss.png')
 
     plt.figure(figsize=(20,10))
     plt.imshow(list_X[best_iter//num_iter_test])

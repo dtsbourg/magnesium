@@ -22,6 +22,7 @@ main.py : The main interface to run MGCNN
 """
 import pandas as pd
 import numpy as np
+import joblib
 
 from mgcnn import load_dataset, train, plot
 
@@ -44,7 +45,7 @@ if __name__ == '__main__':
     interactions = load_netflix(path_dataset)
     M, Lrow, Lcol, Odata, Otraining, Otest = load_dataset(interactions)
     #list_training_loss, list_test_pred_error, list_X, learning_obj = train(M, Lrow, Lcol, Odata, Otraining, Otest)
-    #list_training_loss = joblib.load("list_training_loss.p")
-    #list_test_pred_error = joblib.load("test_pred_errors.p")
-    #list_X = joblib.load("list_X.p")
-    #plot(list_training_loss, list_test_pred_error, list_X, Otest, num_iter_test=250)
+    list_training_loss = joblib.load("list_training_loss.p")
+    list_test_pred_error = joblib.load("test_pred_errors.p")
+    list_X = joblib.load("list_X.p")
+    plot(list_training_loss, list_test_pred_error, list_X, Otest, num_iter_test=50)
