@@ -57,6 +57,7 @@ class MCSession():
         self.persistpath = 'res/'
         self.saver = None
         self.save_path = 'res/model/model.ckpt'
+        self.load_existing = False
 
     # M = ratings
     # O = data mask
@@ -106,8 +107,10 @@ class MCSession():
 
     def train(self):
         print("Starting training ...")
+        if self.graph is None:
+            raise ValueError("Must load dataset before creating model.")
 
-        learning_obj = Train_test_matrix_completion(self.graph.M, self.graph.Lrow, self.graph.Lcol, self.graph.O, self.graph.Otraining, self.graph.Otest,
+        self.learning_obj = Train_test_matrix_completion(self.graph.M, self.graph.Lrow, self.graph.Lcol, self.graph.O, self.graph.Otraining, self.graph.Otest,
                                                     order_chebyshev_col = self.ord_col, order_chebyshev_row = self.ord_row,
                                                     gamma=1e-8, learning_rate=1e-3)
 
@@ -120,8 +123,8 @@ class MCSession():
         num_iter = 0
         for k in range(num_iter, self.num_total_iter_training):
             tic = time.time()
-            _, current_training_loss, norm_grad, X_grad = learning_obj.session.run([learning_obj.optimizer, learning_obj.loss,
-                                                                                    learning_obj.norm_grad, learning_obj.var_grad])
+            _, current_training_loss, norm_grad, X_grad = self.learning_obj.session.run([self.learning_obj.optimizer, self.learning_obj.loss,
+                                                                                         self.learning_obj.norm_grad, self.learning_obj.var_grad])
             training_time = time.time() - tic
 
             list_training_loss.append(current_training_loss)
@@ -135,10 +138,10 @@ class MCSession():
 
                 #Test Code
                 tic = time.time()
-                pred_error, preds, X = learning_obj.session.run([learning_obj.predictions_error,
-                                                                 learning_obj.predictions,
-                                                                 learning_obj.norm_X])
-                c_X_evolutions = learning_obj.session.run(learning_obj.list_X)
+                pred_error, preds, X = self.learning_obj.session.run([self.learning_obj.predictions_error,
+                                                                      self.learning_obj.predictions,
+                                                                      self.learning_obj.norm_X])
+                c_X_evolutions = self.learning_obj.session.run(self.learning_obj.list_X)
                 list_X_evolutions.append(c_X_evolutions)
 
                 test_time = time.time() - tic
@@ -164,13 +167,38 @@ class MCSession():
         self.persist_results()
 
         print("Saving model in file: %s ..." % self.save_path)
-        self.saver = tf.train.Saver(learning_obj.vars)
-        self.saver.save(learning_obj.session, self.save_path)
+        self.saver = tf.train.Saver(self.learning_obj.vars)
+        self.saver.save(self.learning_obj.session, self.save_path)
 
     def load_saved_model(self):
-        self.saver.restore(self.session, self.save_path)
+        if self.graph is None:
+            raise ValueError("Must load dataset before creating model.")
+
+        self.learning_obj = Train_test_matrix_completion(self.graph.M, self.graph.Lrow, self.graph.Lcol, self.graph.O, self.graph.Otraining, self.graph.Otest,
+                                                    order_chebyshev_col = self.ord_col, order_chebyshev_row = self.ord_row,
+                                                    gamma=1e-8, learning_rate=1e-3)
+        self.saver = tf.train.Saver(self.learning_obj.vars)
+        self.saver.restore(self.learning_obj.session, self.save_path)
+
         print("Model restored.")
-        # TODO Evaluate saved model
+        _, current_training_loss, norm_grad, X_grad = self.learning_obj.session.run([self.learning_obj.optimizer, self.learning_obj.loss,
+                                                                                     self.learning_obj.norm_grad, self.learning_obj.var_grad])
+        msg = "[TRN] cost = %3.2e, |grad| = %.2e" % (current_training_loss, norm_grad)
+        print(msg)
+
+        pred_error, preds, X = self.learning_obj.session.run([self.learning_obj.predictions_error,
+                                                              self.learning_obj.predictions,
+                                                              self.learning_obj.norm_X])
+        c_X = self.learning_obj.session.run(self.learning_obj.list_X)
+
+        msg = "[TST] cost = %3.2e" % (pred_error)
+        print(msg)
+
+        self.best_iter       = 0
+        self.list_X          = [X]
+        self.best_pred_error = pred_error
+        self.RMSE            = np.sqrt(np.square(self.best_pred_error)/np.sum(self.graph.Otest))
+
 
     def print_results(self):
         print('Best predictions at iter: %d (error: %f)' % (self.best_iter, self.best_pred_error))

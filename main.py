@@ -50,7 +50,11 @@ if __name__ == '__main__':
 
     session.load_dataset(interactions)
 
-    session.train()
+    session.load_existing = True
 
-    plotter.plot_loss()
+    if session.load_existing:
+        session.load_saved_model()
+    else:
+        session.train()
+        plotter.plot_loss()
     plotter.plot_pred()
