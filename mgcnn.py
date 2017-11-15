@@ -26,10 +26,20 @@ import numpy as np
 from scipy.sparse import csgraph
 import time
 import pandas as pd
-import matplotlib.pyplot as plt
 
 from model import Train_test_matrix_completion
-from graph import interaction_matrix
+from graphutils import interaction_matrix
+
+class UserItemGraph():
+    def __init__(self, users, items):
+        self.sz = (users, items)
+        self.M = np.zeros(self.sz, dtype=np.float)
+        self.O = np.zeros(self.sz, dtype=np.int)
+        self.Otraining = np.zeros(self.sz, dtype=np.int)
+        self.Otest = np.zeros(self.sz, dtype=np.int)
+        self.Lcol = None
+        self.Lrow = None
+
 
 # M = ratings
 # O = data mask
@@ -39,57 +49,54 @@ from graph import interaction_matrix
 # Wcol = movie adjacency matrix
 def load_dataset(interactions, user_count=150, item_count=200, split=0.5):
     # interactions = [us,is,rs]
-    sz = (user_count, item_count); user_range = len(interactions[0])
+    user_range = len(interactions[0])
 
     user_idx = interactions[0]
     item_idx = interactions[1]
     ratings  = interactions[2]
 
     print("Initialising model variables ...")
-    M = np.zeros(sz, dtype=np.float)
-    O = np.zeros(sz, dtype=np.int)
-    Otraining = np.zeros(sz, dtype=np.int)
-    Otest = np.zeros(sz, dtype=np.int)
+    uig = UserItemGraph(user_count, item_count)
 
     print("Building dataset ...")
     for j in range(user_range):
         u = user_idx[j]-1; i=item_idx[j]-1;
-        M[u,i] = ratings[j]
-        O[u,i] = 1
+        uig.M[u,i] = ratings[j]
+        uig.O[u,i] = 1
 
     print("Computing Leave-one-out test split ...")
     for u in user_idx:
-        heldout = np.random.choice(list(O[u-1, :].nonzero())[0],1)
-        Otest[u-1, heldout] = 1
+        heldout = np.random.choice(list(uig.O[u-1, :].nonzero())[0],1)
+        uig.Otest[u-1, heldout] = 1
 
-    Otraining = O - Otest
+    uig.Otraining = uig.O - uig.Otest
 
     print("Building user interaction matrix ...")
     # User interactions
     Wrow = np.zeros((user_count, user_count), dtype=np.int)
-    Wrow = interaction_matrix(Wrow, O, 1)
+    Wrow = interaction_matrix(Wrow, uig.O, 1)
 
     print("Building item interaction matrix ...")
     # Item interactions
     Wcol = np.zeros((item_count, item_count), dtype=np.int)
-    Wcol = interaction_matrix(Wcol, O, 0)
+    Wcol = interaction_matrix(Wcol, uig.O, 0)
 
     print("Computing Laplacian of interactions ...")
-    Lrow = csgraph.laplacian(Wrow, normed=True)
-    Lcol = csgraph.laplacian(Wcol, normed=True)
+    uig.Lrow = csgraph.laplacian(Wrow, normed=True)
+    uig.Lcol = csgraph.laplacian(Wcol, normed=True)
 
-    return M, Lrow, Lcol, O, Otraining, Otest
+    return uig
 
-def train(M, Lrow, Lcol, Odata, Otraining, Otest):
+def train(graph):
     ord_col = 5
     ord_row = 5
 
-    learning_obj = Train_test_matrix_completion(M, Lrow, Lcol, Odata, Otraining, Otest,
+    learning_obj = Train_test_matrix_completion(graph.M, graph.Lrow, graph.Lcol, graph.O, graph.Otraining, graph.Otest,
                                                 order_chebyshev_col = ord_col, order_chebyshev_row = ord_row,
                                                 gamma=1e-8, learning_rate=1e-3)
 
     num_iter_test = 10
-    num_total_iter_training = 50
+    num_total_iter_training = 500
 
     num_iter = 0
 
@@ -144,7 +151,7 @@ def train(M, Lrow, Lcol, Odata, Otraining, Otest):
     best_iter = (np.where(np.asarray(list_training_loss)==np.min(list_training_loss))[0][0]//num_iter_test)*num_iter_test
     best_pred_error = list_test_pred_error[best_iter//num_iter_test]
     print('Best predictions at iter: %d (error: %f)' % (best_iter, best_pred_error))
-    RMSE = np.sqrt(np.square(best_pred_error)/np.sum(Otest))
+    RMSE = np.sqrt(np.square(best_pred_error)/np.sum(graph.Otest))
     print('RMSE: %f' % RMSE)
 
     joblib.dump( list_training_loss, open( "list_training_loss.p", "wb" ) )
@@ -153,29 +160,3 @@ def train(M, Lrow, Lcol, Odata, Otraining, Otest):
     #joblib.dump( learning_obj, open( "learning_obj.p", "wb" ) )
 
     return list_training_loss, list_test_pred_error, list_X, learning_obj
-
-
-
-def plot(list_training_loss, list_test_pred_error, list_X, Otest, num_iter_test):
-    best_iter = (np.where(np.asarray(list_training_loss)==np.min(list_training_loss))[0][0]//num_iter_test)*num_iter_test
-    best_pred_error = list_test_pred_error[best_iter//num_iter_test]
-    print('Best predictions at iter: %d (error: %f)' % (best_iter, best_pred_error))
-    RMSE = np.sqrt(np.square(best_pred_error)/np.sum(Otest))
-    print('RMSE: %f' % RMSE)
-
-    fig, ax1 = plt.subplots(figsize=(20,10))
-
-    ax2 = ax1.twinx()
-    ax1.plot(np.arange(len(list_training_loss)), list_training_loss, 'g-')
-    ax2.plot(np.arange(len(list_test_pred_error))*num_iter_test, list_test_pred_error, 'b-')
-
-    ax1.set_xlabel('Iteration')
-    ax1.set_ylabel('Training loss', color='g')
-    ax2.set_ylabel('Test loss', color='b')
-
-    plt.savefig('loss.png')
-
-    plt.figure(figsize=(20,10))
-    plt.imshow(list_X[best_iter//num_iter_test])
-    plt.colorbar()
-    plt.savefig('results_10kval_n_iter_50')
