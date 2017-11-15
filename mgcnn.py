@@ -15,6 +15,10 @@ Modifications : @dtsbourg (Dylan Bourgeois)
 This code is an attempt to package the code presented in
 https://github.com/fmonti/mgcnn for the Netflix challenge.
 
+---
+
+mgcnn.py : The main interface
+
 """
 
 import os,sys,inspect
@@ -28,19 +32,29 @@ from scipy.sparse import csgraph
 import scipy
 import time
 import pandas as pd
+import matplotlib.pyplot as plt
+
+from model import Train_test_matrix_completion
 
 path_dataset = 'data/data_train.csv'
 
 def interaction_matrix(W, O, ax):
     for k in range(O.shape[ax]):
         if ax==0:
-            a = O[k,:].nonzero()
+            o = O[k,:].copy()
         else:
-            a = O[:,k].nonzero()
+            o = O[:,k].copy()
+        a = o.nonzero()
         for i in a:
             for j in i:
-                W[j, i[:j]] = 1
-                W[j, i[j+1:]] = 1
+                o_ = o
+                o_[j] = 0
+                if ax == 0:
+                    W[j,:] += o_
+                    #W[j,:] = np.logical_or(W[j,:], o_).astype(int)
+                else:
+                    W[:,j] += o_
+                    #W[:,j] = np.logical_or(W[:,j], o_).astype(int)
     return W
 
 
@@ -51,20 +65,16 @@ def load_dataset(path=path_dataset, user_count=150, item_count=200, split=0.5):
     # Otest = test mask
     # Wrow = user adjacency matrix
     # Wcol = movie adjacency matrix
-
     print("Loading dataset ...")
     ratings = pd.read_csv(path_dataset, dtype={'Prediction': np.float})
     print("Extracting index ...")
     idx = ratings.Id.str.extract('r([0-9]+)_c([0-9]+)', expand=True)
+    idx = idx[(idx[0].astype(int)<user_count) & (idx[1].astype(int)<item_count)].reset_index(drop=True)
 
-    user_idx = idx[0].astype(int); user_idx = np.asarray(user_idx[user_idx <= user_count]);
-    item_idx = idx[1].astype(int); item_idx = np.asarray(item_idx[item_idx <= item_count]);
+    user_idx = idx[0].astype(int)
+    item_idx = idx[1].astype(int)
     sz = (user_count, item_count)
-
-    print("Computing test split ...")
-    u_test = int(len(user_idx)*split)
-    i_test = int(len(item_idx)*split)
-    test_idx = list(zip(np.random.choice(user_idx,u_test),np.random.choice(item_idx,i_test)))
+    user_range = len(idx)
 
     print("Initialising model variables ...")
     M = np.zeros(sz, dtype=np.float)
@@ -73,16 +83,17 @@ def load_dataset(path=path_dataset, user_count=150, item_count=200, split=0.5):
     Otest = np.zeros(sz, dtype=np.int)
 
     print("Building dataset ...")
-    for j in range(len(user_idx)):
+    for j in range(user_range):
         u = user_idx[j]-1; i=item_idx[j]-1;
-        #print(u,i)
         M[u,i] = ratings.Prediction[j]
         O[u,i] = 1
 
-        if np.any(test_idx[:] == (u,i)):
-            Otest[u,i] = 1
-        else:
-            Otraining[u,i] = 1
+    print("Computing Leave-one-out test split ...")
+    for u in user_idx:
+        heldout = np.random.choice(list(O[u-1, :].nonzero())[0],1)
+        Otest[u-1, heldout] = 1
+
+    Otraining = O - Otest
 
     print("Building user interaction matrix ...")
     # User interactions
@@ -98,4 +109,4 @@ def load_dataset(path=path_dataset, user_count=150, item_count=200, split=0.5):
     Lrow = csgraph.laplacian(Wrow, normed=True)
     Lcol = csgraph.laplacian(Wcol, normed=True)
 
-load_dataset()
+    return M, Lrow, Lcol, O, Otraining, Otest
